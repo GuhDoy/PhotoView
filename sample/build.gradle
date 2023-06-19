@@ -18,7 +18,8 @@ android {
         targetCompatibility JavaVersion.VERSION_1_8
     }
 
-    lintOptions {
+    namespace 'com.github.chrisbanes.photoview.sample'
+    lint {
         abortOnError false
     }
 }
