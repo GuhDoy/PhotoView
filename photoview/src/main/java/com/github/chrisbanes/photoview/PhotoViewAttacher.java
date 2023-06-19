@@ -1,5 +1,6 @@
 /*
  Copyright 2011, 2012 Chris Banes.
+ Copyright 2023 Green Mushroom
  <p>
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -16,10 +17,15 @@
 package com.github.chrisbanes.photoview;
 
 import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.Matrix.ScaleToFit;
+import android.graphics.Paint;
+import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
+import android.os.ParcelFileDescriptor;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.View;
@@ -30,6 +36,12 @@ import android.view.animation.Interpolator;
 import android.widget.ImageView;
 import android.widget.ImageView.ScaleType;
 import android.widget.OverScroller;
+
+import androidx.annotation.MainThread;
+import androidx.annotation.Nullable;
+
+import java.io.IOException;
+import java.util.List;
 
 /**
  * The component of {@link PhotoView} which does the work allowing for zooming, scaling, panning, etc.
@@ -43,6 +55,7 @@ public class PhotoViewAttacher implements View.OnTouchListener,
     private static float DEFAULT_MID_SCALE = 1.75f;
     private static float DEFAULT_MIN_SCALE = 1.0f;
     private static int DEFAULT_ZOOM_DURATION = 200;
+    private static final boolean DEBUG = false;
 
     private static final int HORIZONTAL_EDGE_NONE = -1;
     private static final int HORIZONTAL_EDGE_LEFT = 0;
@@ -64,6 +77,17 @@ public class PhotoViewAttacher implements View.OnTouchListener,
     private boolean mBlockParentIntercept = false;
 
     private ImageView mImageView;
+
+    // Tiles
+    private TilesProvider mTilesProvider;
+    private Paint mBitmapPaint;
+    private Paint mDebugLinePaint;
+    private final Matrix mDisplayMatrix = new Matrix();
+    private final Rect mFileRect = new Rect();
+    private List<Tile> mTiles;
+    private final RectF mSrcRectF = new RectF();
+    private final RectF mDstRectF = new RectF();
+    private final Matrix mTilesMatrix = new Matrix();
 
     // Gesture Detectors
     private GestureDetector mGestureDetector;
@@ -710,6 +734,114 @@ public class PhotoViewAttacher implements View.OnTouchListener,
 
     private int getImageViewHeight(ImageView imageView) {
         return imageView.getHeight() - imageView.getPaddingTop() - imageView.getPaddingBottom();
+    }
+
+    public void setupTilesProvider(@Nullable ParcelFileDescriptor pfd) {
+        try {
+            mTilesProvider = pfd == null ? null : new TilesProvider(pfd, tiles -> {
+                mTiles = tiles;
+                if (mImageView != null) {
+                    mImageView.postInvalidate();
+                }
+            });
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Creates Paint objects once when first needed.
+     */
+    @MainThread
+    private void maybeCreatePaints() {
+        if (mBitmapPaint == null) {
+            mBitmapPaint = new Paint();
+            mBitmapPaint.setAntiAlias(true);
+            mBitmapPaint.setFilterBitmap(true);
+            mBitmapPaint.setDither(true);
+        }
+        if (mDebugLinePaint == null && DEBUG) {
+            mDebugLinePaint = new Paint();
+            mDebugLinePaint.setColor(Color.MAGENTA);
+            mDebugLinePaint.setStyle(Paint.Style.STROKE);
+            mDebugLinePaint.setStrokeWidth(mImageView.getResources().getDisplayMetrics().density);
+        }
+    }
+
+    @MainThread
+    private void updateFileRect(float scale) {
+        final RectF displayRect = getDisplayRect();
+        final float viewWidth = getImageViewWidth(mImageView);
+        final float viewHeight = getImageViewHeight(mImageView);
+        if (displayRect.left > 0) {
+            displayRect.offsetTo(0, (int) displayRect.top);
+        } else if (displayRect.top > 0) {
+            displayRect.offsetTo((int) displayRect.left, 0);
+        }
+        mDisplayMatrix.reset();
+        mDisplayMatrix.postScale(1 / scale, 1 / scale);
+        final Drawable d = mImageView.getDrawable();
+        final float sx = (float) mTilesProvider.getWidth() / d.getIntrinsicWidth();
+        final float sy = (float) mTilesProvider.getHeight() / d.getIntrinsicHeight();
+        mDisplayMatrix.postScale(sx, sy);
+        mDisplayMatrix.mapRect(displayRect);
+        final float displayWidth = viewWidth * sx / scale;
+        final float displayHeight = viewHeight * sy / scale;
+        mFileRect.set(
+                (int) (0 - displayRect.left),
+                (int) (0 - displayRect.top),
+                (int) (displayWidth > mTilesProvider.getWidth() ?
+                        displayRect.right : displayWidth - displayRect.left),
+                (int) (displayHeight > mTilesProvider.getHeight() ?
+                        displayRect.bottom : displayHeight - displayRect.top)
+        );
+    }
+
+    @MainThread
+    public void maybeDraw(Canvas canvas) {
+        if (mTilesProvider == null) {
+            return;
+        }
+        maybeCreatePaints();
+        updateFileRect(getScale());
+        final RectF displayRect = getDisplayRect();
+        if (mTiles == null) {
+            mTiles = mTilesProvider.requestTiles(
+                    displayRect.width() / mTilesProvider.getWidth(),
+                    getImageViewWidth(mImageView),
+                    getImageViewHeight(mImageView),
+                    mFileRect
+            );
+        }
+        // Render all loaded tiles. List used for bottom up rendering - lower res tiles underneath.
+        for (final Tile tile : mTiles) {
+            mSrcRectF.set(0, 0, tile.bitmap.getWidth(), tile.bitmap.getHeight());
+            mDstRectF.set(tile.rect);
+            mTilesMatrix.set(mDisplayMatrix);
+            mTilesMatrix.invert(mTilesMatrix);
+            mTilesMatrix.postTranslate(displayRect.left, displayRect.top);
+            mTilesMatrix.mapRect(mDstRectF);
+            switch (mTilesProvider.getOrientation()) {
+                case 0:
+                    // mDstRectF.set(mDstRectF.left, mDstRectF.top, mDstRectF.right, mDstRectF.bottom);
+                    break;
+                case 90:
+                    mDstRectF.set(mDstRectF.top, mDstRectF.left, mDstRectF.bottom, mDstRectF.right);
+                    break;
+                case 180:
+                    mDstRectF.set(mDstRectF.right, mDstRectF.bottom, mDstRectF.left, mDstRectF.top);
+                    break;
+                case 270:
+                    mDstRectF.set(mDstRectF.bottom, mDstRectF.right, mDstRectF.top, mDstRectF.left);
+                    break;
+            }
+            mTilesMatrix.setRectToRect(mSrcRectF, mDstRectF, Matrix.ScaleToFit.FILL);
+            canvas.drawBitmap(tile.bitmap, mTilesMatrix, mBitmapPaint);
+            if (DEBUG) {
+                canvas.drawRect(mDstRectF, mDebugLinePaint);
+            }
+        }
+        mTiles = null;
     }
 
     private void cancelFling() {
