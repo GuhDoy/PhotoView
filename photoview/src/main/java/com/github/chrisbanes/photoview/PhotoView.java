@@ -1,5 +1,6 @@
 /*
  Copyright 2011, 2012 Chris Banes.
+ Copyright 2023 Green Mushroom
  <p>
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -16,13 +17,16 @@
 package com.github.chrisbanes.photoview;
 
 import android.content.Context;
+import android.graphics.Canvas;
 import android.graphics.Matrix;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
+import android.os.ParcelFileDescriptor;
 import android.util.AttributeSet;
 import android.view.GestureDetector;
 
+import androidx.annotation.Nullable;
 import androidx.appcompat.widget.AppCompatImageView;
 
 /**
@@ -58,6 +62,16 @@ public class PhotoView extends AppCompatImageView {
             setScaleType(pendingScaleType);
             pendingScaleType = null;
         }
+    }
+
+    public void setupTilesProvider(@Nullable ParcelFileDescriptor pfd) {
+        attacher.setupTilesProvider(pfd);
+    }
+
+    @Override
+    protected void onDraw(Canvas canvas) {
+        super.onDraw(canvas);
+        attacher.maybeDraw(canvas);
     }
 
     /**
