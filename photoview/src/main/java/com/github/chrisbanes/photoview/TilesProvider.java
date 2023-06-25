@@ -27,6 +27,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.ParcelFileDescriptor;
 
+import androidx.annotation.GuardedBy;
 import androidx.annotation.MainThread;
 import androidx.annotation.NonNull;
 import androidx.annotation.WorkerThread;
@@ -49,8 +50,9 @@ public class TilesProvider {
     private final int mExifOrientation;
     private final Consumer<List<Tile>> mCallback;
     private final Map<Integer, List<Tile>> mSampleSizeToTileGrid = new HashMap<>();
+    private volatile int mLastRequestSampleSize;
+    @GuardedBy("mLastRequestRect")
     private final Rect mLastRequestRect = new Rect();
-    private int mLastRequestSampleSize;
     private final ThreadLocal<Rect> mLocalRect = ThreadLocal.withInitial(Rect::new);
     private final MainThreadExecutor mMainThreadExecutor = new MainThreadExecutor();
     private final ArrayList<Tile> mTilesHit = new ArrayList<>();
@@ -319,6 +321,15 @@ public class TilesProvider {
         return decodeRegion(localRect, sampleSize);
     }
 
+    private boolean isStillNeeded(int sampleSize, Tile tile) {
+        if (mLastRequestSampleSize != sampleSize) {
+            return false;
+        }
+        synchronized (mLastRequestRect) {
+            return Rect.intersects(mLastRequestRect, tile.rect);
+        }
+    }
+
     @MainThread
     private boolean getOrLoadTiles(@NonNull List<Tile> dst, @NonNull List<Tile> tileGrid,
                                    int sampleSize, @NonNull Rect displayRect) {
@@ -332,20 +343,23 @@ public class TilesProvider {
                     // Check the loading flag to prevent duplicated decode tasks.
                     if (!tile.loading) {
                         tile.loading = true;
-                        AsyncTask.THREAD_POOL_EXECUTOR.execute(() -> {
-                            final Bitmap bitmap = decodeRegionRotated(tile.rect, sampleSize);
-                            mMainThreadExecutor.execute(() -> {
-                                tile.loading = false;
-                                // Check if we should notify the callback that the tile is loaded.
-                                if (mLastRequestSampleSize == sampleSize &&
-                                        Rect.intersects(mLastRequestRect, tile.rect)) {
-                                    tile.bitmap = bitmap;
-                                    mTilesHit.add(tile);
-                                    mCallback.accept(Collections.unmodifiableList(mTilesHit));
-                                } else {
-                                    bitmap.recycle();
-                                }
-                            });
+                        AsyncTask.SERIAL_EXECUTOR.execute(() -> {
+                            if (isStillNeeded(sampleSize, tile)) {
+                                final Bitmap bitmap = decodeRegionRotated(tile.rect, sampleSize);
+                                mMainThreadExecutor.execute(() -> {
+                                    tile.loading = false;
+                                    // Check if we should notify the callback that the tile is loaded.
+                                    if (isStillNeeded(sampleSize, tile)) {
+                                        tile.bitmap = bitmap;
+                                        mTilesHit.add(tile);
+                                        mCallback.accept(Collections.unmodifiableList(mTilesHit));
+                                    } else {
+                                        bitmap.recycle();
+                                    }
+                                });
+                            } else {
+                                mMainThreadExecutor.execute(() -> tile.loading = false);
+                            }
                         });
                     }
                 }
@@ -367,9 +381,12 @@ public class TilesProvider {
             mSampleSizeToTileGrid.put(sampleSize, tileGrid);
         }
 
-        mTilesHit.clear();
-        mLastRequestRect.set(displayRect);
         mLastRequestSampleSize = sampleSize;
+        synchronized (mLastRequestRect) {
+            mLastRequestRect.set(displayRect);
+        }
+
+        mTilesHit.clear();
         final boolean hitAll = getOrLoadTiles(mTilesHit, tileGrid, sampleSize, displayRect);
         if (hitAll) {
             // Recycle tiles in other sampleSize.
