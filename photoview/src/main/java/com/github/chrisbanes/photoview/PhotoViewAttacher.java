@@ -85,8 +85,9 @@ public class PhotoViewAttacher implements View.OnTouchListener,
     private final Matrix mDisplayMatrix = new Matrix();
     private final Rect mFileRect = new Rect();
     private List<Tile> mTiles;
-    private final RectF mSrcRectF = new RectF();
     private final RectF mDstRectF = new RectF();
+    private final float[] mSrcArray = new float[8];
+    private final float[] mDstArray = new float[8];
     private final Matrix mTilesMatrix = new Matrix();
 
     // Gesture Detectors
@@ -797,6 +798,21 @@ public class PhotoViewAttacher implements View.OnTouchListener,
         );
     }
 
+    /**
+     * Helper method for setting the values of a tile matrix array.
+     */
+    private void setMatrixArray(float[] array, float f0, float f1, float f2, float f3,
+                                float f4, float f5, float f6, float f7) {
+        array[0] = f0;
+        array[1] = f1;
+        array[2] = f2;
+        array[3] = f3;
+        array[4] = f4;
+        array[5] = f5;
+        array[6] = f6;
+        array[7] = f7;
+    }
+
     @MainThread
     public void maybeDraw(Canvas canvas) {
         if (mTilesProvider == null) {
@@ -815,27 +831,37 @@ public class PhotoViewAttacher implements View.OnTouchListener,
         }
         // Render all loaded tiles. List used for bottom up rendering - lower res tiles underneath.
         for (final Tile tile : mTiles) {
-            mSrcRectF.set(0, 0, tile.bitmap.getWidth(), tile.bitmap.getHeight());
             mDstRectF.set(tile.rect);
             mTilesMatrix.set(mDisplayMatrix);
             mTilesMatrix.invert(mTilesMatrix);
             mTilesMatrix.postTranslate(displayRect.left, displayRect.top);
             mTilesMatrix.mapRect(mDstRectF);
+            setMatrixArray(mSrcArray, 0, 0, tile.bitmap.getWidth(), 0,
+                    tile.bitmap.getWidth(), tile.bitmap.getHeight(), 0, tile.bitmap.getHeight());
             switch (mTilesProvider.getOrientation()) {
                 case 0:
-                    // mDstRectF.set(mDstRectF.left, mDstRectF.top, mDstRectF.right, mDstRectF.bottom);
+                    setMatrixArray(mDstArray,
+                            mDstRectF.left, mDstRectF.top, mDstRectF.right, mDstRectF.top,
+                            mDstRectF.right, mDstRectF.bottom, mDstRectF.left, mDstRectF.bottom);
                     break;
                 case 90:
-                    mDstRectF.set(mDstRectF.top, mDstRectF.left, mDstRectF.bottom, mDstRectF.right);
+                    setMatrixArray(mDstArray,
+                            mDstRectF.right, mDstRectF.top, mDstRectF.right, mDstRectF.bottom,
+                            mDstRectF.left, mDstRectF.bottom, mDstRectF.left, mDstRectF.top);
                     break;
                 case 180:
-                    mDstRectF.set(mDstRectF.right, mDstRectF.bottom, mDstRectF.left, mDstRectF.top);
+                    setMatrixArray(mDstArray,
+                            mDstRectF.right, mDstRectF.bottom, mDstRectF.left, mDstRectF.bottom,
+                            mDstRectF.left, mDstRectF.top, mDstRectF.right, mDstRectF.top);
                     break;
                 case 270:
-                    mDstRectF.set(mDstRectF.bottom, mDstRectF.right, mDstRectF.top, mDstRectF.left);
+                    setMatrixArray(mDstArray,
+                            mDstRectF.left, mDstRectF.bottom, mDstRectF.left, mDstRectF.top,
+                            mDstRectF.right, mDstRectF.top, mDstRectF.right, mDstRectF.bottom);
                     break;
             }
-            mTilesMatrix.setRectToRect(mSrcRectF, mDstRectF, Matrix.ScaleToFit.FILL);
+            mTilesMatrix.reset();
+            mTilesMatrix.setPolyToPoly(mSrcArray, 0, mDstArray, 0, 4);
             canvas.drawBitmap(tile.bitmap, mTilesMatrix, mBitmapPaint);
             if (DEBUG) {
                 canvas.drawRect(mDstRectF, mDebugLinePaint);
