@@ -45,6 +45,7 @@ import java.util.function.Consumer;
 
 public class TilesProvider {
     private final BitmapRegionDecoder mDecoder;
+    private final Bitmap.Config mBitmapConfig = Bitmap.Config.RGB_565;
     private final int mWidth;
     private final int mHeight;
     private final int mExifOrientation;
@@ -277,6 +278,7 @@ public class TilesProvider {
         assertBackgroundThread();
         BitmapFactory.Options options = new BitmapFactory.Options();
         options.inSampleSize = sampleSize;
+        options.inPreferredConfig = mBitmapConfig;
         Bitmap bitmap = mDecoder.decodeRegion(rect, options);
         if (bitmap == null) {
             throw new RuntimeException("Skia image decoder returned null bitmap - " +
