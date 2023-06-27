@@ -26,6 +26,7 @@ import android.os.ParcelFileDescriptor;
 import android.util.AttributeSet;
 import android.view.GestureDetector;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.widget.AppCompatImageView;
 
@@ -64,8 +65,9 @@ public class PhotoView extends AppCompatImageView {
         }
     }
 
-    public void setupTilesProvider(@Nullable ParcelFileDescriptor pfd) {
-        attacher.setupTilesProvider(pfd);
+    @Nullable
+    public TilesProvider setupTilesProvider(@Nullable ParcelFileDescriptor pfd) {
+        return attacher.setupTilesProvider(pfd);
     }
 
     @Override
