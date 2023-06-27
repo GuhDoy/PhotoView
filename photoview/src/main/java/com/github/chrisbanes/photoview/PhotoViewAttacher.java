@@ -737,7 +737,8 @@ public class PhotoViewAttacher implements View.OnTouchListener,
         return imageView.getHeight() - imageView.getPaddingTop() - imageView.getPaddingBottom();
     }
 
-    public void setupTilesProvider(@Nullable ParcelFileDescriptor pfd) {
+    @Nullable
+    public TilesProvider setupTilesProvider(@Nullable ParcelFileDescriptor pfd) {
         try {
             mTilesProvider = pfd == null ? null : new TilesProvider(pfd, tiles -> {
                 mTiles = tiles;
@@ -745,6 +746,7 @@ public class PhotoViewAttacher implements View.OnTouchListener,
                     mImageView.postInvalidate();
                 }
             });
+            return mTilesProvider;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -860,7 +862,6 @@ public class PhotoViewAttacher implements View.OnTouchListener,
                             mDstRectF.right, mDstRectF.top, mDstRectF.right, mDstRectF.bottom);
                     break;
             }
-            mTilesMatrix.reset();
             mTilesMatrix.setPolyToPoly(mSrcArray, 0, mDstArray, 0, 4);
             canvas.drawBitmap(tile.bitmap, mTilesMatrix, mBitmapPaint);
             if (DEBUG) {

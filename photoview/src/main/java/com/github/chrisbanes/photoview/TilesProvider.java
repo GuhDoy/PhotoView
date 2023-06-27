@@ -30,6 +30,7 @@ import android.os.ParcelFileDescriptor;
 import androidx.annotation.GuardedBy;
 import androidx.annotation.MainThread;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.annotation.WorkerThread;
 import androidx.exifinterface.media.ExifInterface;
 
@@ -45,7 +46,7 @@ import java.util.function.Consumer;
 
 public class TilesProvider {
     private final BitmapRegionDecoder mDecoder;
-    private final Bitmap.Config mBitmapConfig = Bitmap.Config.RGB_565;
+    private Bitmap.Config mBitmapConfig = Bitmap.Config.RGB_565;
     private final int mWidth;
     private final int mHeight;
     private final int mExifOrientation;
@@ -173,6 +174,7 @@ public class TilesProvider {
      */
     @MainThread
     public void recycle() {
+        assertMainThread();
         mDecoder.recycle();
         for (final Map.Entry<Integer, List<Tile>> entry : mSampleSizeToTileGrid.entrySet()) {
             for (final Tile tile : entry.getValue()) {
@@ -220,6 +222,7 @@ public class TilesProvider {
     /**
      * Once source image and view dimensions are known, creates a map of sample size to tile grid.
      */
+    @NonNull
     private List<Tile> createTileGrid(int sampleSize, int viewWidth, int viewHeight) {
         int xTiles = 1;
         int yTiles = 1;
@@ -250,6 +253,20 @@ public class TilesProvider {
             }
         }
         return tileGrid;
+    }
+
+    /**
+     * If this is non-null, the decoder will try to decode into this
+     * internal configuration. If it is null, or the request cannot be met,
+     * the decoder will try to pick the best matching config based on the
+     * system's screen depth, and characteristics of the original image such
+     * as if it has per-pixel alpha (requiring a config that also does).
+     * <p>
+     * Image are loaded with the {@link Bitmap.Config#ARGB_8888} config by
+     * default.
+     */
+    public void setPreferredConfig(@Nullable Bitmap.Config bitmapConfig) {
+        mBitmapConfig = bitmapConfig;
     }
 
     /**
@@ -300,6 +317,8 @@ public class TilesProvider {
     }
 
     @SuppressWarnings("SuspiciousNameCombination")
+    @WorkerThread
+    @NonNull
     private Bitmap decodeRegionRotated(@NonNull Rect rect, int sampleSize) {
         final Rect localRect = mLocalRect.get();
         assert localRect != null;
@@ -346,7 +365,7 @@ public class TilesProvider {
                     if (!tile.loading) {
                         tile.loading = true;
                         AsyncTask.SERIAL_EXECUTOR.execute(() -> {
-                            if (isStillNeeded(sampleSize, tile)) {
+                            if (!isRecycled() && isStillNeeded(sampleSize, tile)) {
                                 final Bitmap bitmap = decodeRegionRotated(tile.rect, sampleSize);
                                 mMainThreadExecutor.execute(() -> {
                                     tile.loading = false;
@@ -373,9 +392,12 @@ public class TilesProvider {
     }
 
     @MainThread
-    public List<Tile> requestTiles(float scale, int viewWidth, int viewHeight,
-                                   @NonNull Rect displayRect) {
+    @NonNull
+    List<Tile> requestTiles(float scale, int viewWidth, int viewHeight, @NonNull Rect displayRect) {
         assertMainThread();
+        if (isRecycled()) {
+            return Collections.emptyList();
+        }
         final int sampleSize = calculateInSampleSize(scale);
         List<Tile> tileGrid = mSampleSizeToTileGrid.get(sampleSize);
         if (tileGrid == null) {
