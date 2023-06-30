@@ -327,16 +327,16 @@ public class TilesProvider {
                 localRect.set(rect);
                 break;
             case 90:
-                localRect.set(rect.top, getHeight() - rect.right,
-                        rect.bottom, getHeight() - rect.left);
+                localRect.set(rect.top, mHeight - rect.right,
+                        rect.bottom, mHeight - rect.left);
                 break;
             case 180:
-                localRect.set(getWidth() - rect.right, getHeight() - rect.bottom,
-                        getWidth() - rect.left, getHeight() - rect.top);
+                localRect.set(mWidth - rect.right, mHeight - rect.bottom,
+                        mWidth - rect.left, mHeight - rect.top);
                 break;
             case 270:
-                localRect.set(getWidth() - rect.bottom, rect.left,
-                        getWidth() - rect.top, rect.right);
+                localRect.set(mWidth - rect.bottom, rect.left,
+                        mWidth - rect.top, rect.right);
                 break;
         }
         return decodeRegion(localRect, sampleSize);
