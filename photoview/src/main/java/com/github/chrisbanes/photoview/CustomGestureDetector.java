@@ -44,7 +44,7 @@ class CustomGestureDetector {
         final ViewConfiguration configuration = ViewConfiguration
                 .get(context);
         mMinimumVelocity = configuration.getScaledMinimumFlingVelocity();
-        mTouchSlop = configuration.getScaledTouchSlop();
+        mTouchSlop = configuration.getScaledPagingTouchSlop();
 
         mListener = listener;
         ScaleGestureDetector.OnScaleGestureListener mScaleListener = new ScaleGestureDetector.OnScaleGestureListener() {
