@@ -171,14 +171,12 @@ public class PhotoViewAttacher implements View.OnTouchListener,
 
         @Override
         public void onScale(float scaleFactor, float focusX, float focusY, float dx, float dy) {
-            if (getScale() < mMaxScale || scaleFactor < 1f) {
-                if (mScaleChangeListener != null) {
-                    mScaleChangeListener.onScaleChange(scaleFactor, focusX, focusY);
-                }
-                mSuppMatrix.postScale(scaleFactor, scaleFactor, focusX, focusY);
-                mSuppMatrix.postTranslate(dx, dy);
-                checkAndDisplayMatrix();
+            if (mScaleChangeListener != null) {
+                mScaleChangeListener.onScaleChange(scaleFactor, focusX, focusY);
             }
+            mSuppMatrix.postScale(scaleFactor, scaleFactor, focusX, focusY);
+            mSuppMatrix.postTranslate(dx, dy);
+            checkAndDisplayMatrix();
         }
     };
 
@@ -389,7 +387,7 @@ public class PhotoViewAttacher implements View.OnTouchListener,
                         RectF rect = getDisplayRect();
                         if (rect != null) {
                             v.post(new AnimatedZoomRunnable(getScale(), mMaxScale,
-                                rect.centerX(), rect.centerY()));
+                                ev.getX(), ev.getY()));
                             handled = true;
                         }
                     }
