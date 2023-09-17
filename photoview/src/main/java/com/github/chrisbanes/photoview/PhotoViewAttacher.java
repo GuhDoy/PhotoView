@@ -745,6 +745,7 @@ public class PhotoViewAttacher implements View.OnTouchListener,
                     mImageView.postInvalidate();
                 }
             });
+            mImageView.postInvalidate();
             return mTilesProvider;
         } catch (IOException e) {
             throw new RuntimeException(e);
