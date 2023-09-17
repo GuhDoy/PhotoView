@@ -414,9 +414,8 @@ public class TilesProvider {
                     iterator.remove();
                 }
             }
-        } else if (sampleSize != 1) {
-            // Load tiles in other sampleSize. However, don't load when sampleSize is 1,
-            // as loading requested tiles at this time is already a heavy task.
+        } else {
+            // Load tiles in other sampleSize.
             for (final Map.Entry<Integer, List<Tile>> entry : mSampleSizeToTileGrid.entrySet()) {
                 if (entry.getKey() > sampleSize) {
                     getTilesHit(mTilesHit, entry.getValue(), displayRect);
