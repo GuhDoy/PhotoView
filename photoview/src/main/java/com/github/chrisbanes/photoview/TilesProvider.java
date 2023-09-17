@@ -191,25 +191,12 @@ public class TilesProvider {
      * Calculates sample size to fit the source image in given bounds.
      */
     private int calculateInSampleSize(float scale) {
-        final int reqWidth = (int) (getWidth() * scale);
-        final int reqHeight = (int) (getHeight() * scale);
-
-        // Raw width and height of image
-        int inSampleSize = 1;
-        if (reqWidth == 0 || reqHeight == 0) {
+        if (scale == 0F) {
             return 32;
         }
 
-        if (getWidth() > reqWidth || getHeight() > reqHeight) {
-            // Calculate ratios of width and height to requested width and height
-            final int widthRatio = Math.round((float) getWidth() / (float) reqWidth);
-            final int heightRatio = Math.round((float) getWidth() / (float) reqHeight);
-
-            // Choose the smallest ratio as inSampleSize value, this will guarantee
-            // a final image with both dimensions larger than or equal to the
-            // requested width and height.
-            inSampleSize = Math.min(widthRatio, heightRatio);
-        }
+        // Raw width and height of image
+        float inSampleSize = 1 / scale;
 
         // We want the actual sample size that will be used, so round down to nearest power of 2.
         int power = 1;
