@@ -144,7 +144,7 @@ public class PhotoViewAttacher implements View.OnTouchListener,
             ViewParent parent = mImageView.getParent();
             if (parent != null) {
                 if (mAllowParentInterceptOnEdge && !mBlockParentIntercept &&
-                        Math.abs(dx) * 0.5F >= Math.abs(dy)) {
+                        Math.abs(dx) >= Math.abs(dy)) {
                     if (mHorizontalScrollEdge == HORIZONTAL_EDGE_BOTH ||
                             mHorizontalScrollEdge == HORIZONTAL_EDGE_LEFT ||
                             mHorizontalScrollEdge == HORIZONTAL_EDGE_RIGHT) {

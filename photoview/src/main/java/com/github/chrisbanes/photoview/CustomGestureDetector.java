@@ -56,7 +56,7 @@ class CustomGestureDetector {
 
                 if (Float.isNaN(scaleFactor) || Float.isInfinite(scaleFactor))
                     return false;
-             
+
                 if (scaleFactor >= 0) {
                     mListener.onScale(scaleFactor,
                             detector.getFocusX(),
@@ -83,6 +83,8 @@ class CustomGestureDetector {
             }
         };
         mDetector = new ScaleGestureDetector(context, mScaleListener);
+        // Disable because PhotoView has customized double-tap gesture.
+        mDetector.setQuickScaleEnabled(false);
     }
 
     private float getActiveX(MotionEvent ev) {
