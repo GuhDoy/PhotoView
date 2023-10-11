@@ -417,7 +417,7 @@ public class TilesProvider {
         } else {
             // Load tiles in other sampleSize.
             for (final Map.Entry<Integer, List<Tile>> entry : mSampleSizeToTileGrid.entrySet()) {
-                if (entry.getKey() > sampleSize) {
+                if (entry.getKey() != sampleSize) {
                     getTilesHit(mTilesHit, entry.getValue(), displayRect);
                 }
             }
