@@ -46,7 +46,7 @@ import java.util.function.Consumer;
 
 public class TilesProvider {
     private final BitmapRegionDecoder mDecoder;
-    private Bitmap.Config mBitmapConfig = Bitmap.Config.RGB_565;
+    private Bitmap.Config mBitmapConfig = Bitmap.Config.ARGB_8888;
     private final int mWidth;
     private final int mHeight;
     private final int mExifOrientation;
